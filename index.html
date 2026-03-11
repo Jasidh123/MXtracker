@@ -509,9 +509,12 @@
     }
     setCardLoading(reg, true);
     try {
-      const auth = getAuthHeader();
-      const opts = auth ? {headers:{'Authorization':auth}} : {};
-      const resp = await fetch('https://opensky-network.org/api/states/all?icao24='+ac.icao24.toLowerCase(), opts);
+      const u = localStorage.getItem('os_user');
+      const p = localStorage.getItem('os_pass');
+      const base = u && p
+        ? 'https://'+encodeURIComponent(u)+':'+encodeURIComponent(p)+'@opensky-network.org/api/states/all'
+        : 'https://opensky-network.org/api/states/all';
+      const resp = await fetch(base + '?icao24=' + ac.icao24.toLowerCase());
       if (!resp.ok) {
         flightData[reg]={status:'rate_limit',updatedAt:new Date()};
       } else {
