@@ -198,8 +198,8 @@
   <div class="cred-panel" id="credPanel">
     <div class="plabel">OpenSky Credentials &mdash; stored locally in your browser only</div>
     <div class="cred-row">
-      <div class="cred-field"><label>Username</label><input id="osUser" type="text" /></div>
-      <div class="cred-field"><label>Password</label><input id="osPass" type="password" /></div>
+      <div class="cred-field"><label>Client ID</label><input id="osUser" type="text" /></div>
+      <div class="cred-field"><label>Client Secret</label><input id="osPass" type="password" /></div>
       <button class="btn primary" onclick="saveCredentials()">Save</button>
       <button class="btn" onclick="clearCredentials()">Clear</button>
     </div>
@@ -509,12 +509,9 @@
     }
     setCardLoading(reg, true);
     try {
-      const u = localStorage.getItem('os_user');
-      const p = localStorage.getItem('os_pass');
-      const base = u && p
-        ? 'https://'+encodeURIComponent(u)+':'+encodeURIComponent(p)+'@opensky-network.org/api/states/all'
-        : 'https://opensky-network.org/api/states/all';
-      const resp = await fetch(base + '?icao24=' + ac.icao24.toLowerCase());
+      const token = await getBearerToken();
+      const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+      const resp = await fetch('https://opensky-network.org/api/states/all?icao24=' + ac.icao24.toLowerCase(), {headers});
       if (!resp.ok) {
         flightData[reg]={status:'rate_limit',updatedAt:new Date()};
       } else {
@@ -680,33 +677,60 @@
       </div>`;
   }
 
-  // ── Credentials ───────────────────────────────────────────────
-  function toggleCredPanel() {
-    const p=document.getElementById('credPanel');
-    p.style.display=p.style.display==='none'||p.style.display===''?'block':'none';
-    if (p.style.display==='block') {
-      const u=localStorage.getItem('os_user')||'';
-      document.getElementById('osUser').value=u;
-      document.getElementById('osPass').value=localStorage.getItem('os_pass')||'';
-      document.getElementById('credStatus').textContent=u?'Logged in as: '+u:'No credentials saved';
+  // ── Credentials (OAuth2 Bearer Token) ────────────────────────
+  let cachedToken = null;
+  let tokenExpiry = 0;
+
+  async function getBearerToken() {
+    // Return cached token if still valid (with 60s buffer)
+    if (cachedToken && Date.now() < tokenExpiry - 60000) return cachedToken;
+    const id = localStorage.getItem('os_client_id');
+    const secret = localStorage.getItem('os_client_secret');
+    if (!id || !secret) return null;
+    try {
+      const resp = await fetch('https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'grant_type=client_credentials&client_id='+encodeURIComponent(id)+'&client_secret='+encodeURIComponent(secret)
+      });
+      if (!resp.ok) { cachedToken=null; return null; }
+      const json = await resp.json();
+      cachedToken = json.access_token;
+      tokenExpiry = Date.now() + (json.expires_in * 1000);
+      document.getElementById('credStatus').textContent = 'Authenticated successfully';
+      return cachedToken;
+    } catch(e) {
+      cachedToken = null; return null;
     }
   }
+
+  function toggleCredPanel() {
+    const p = document.getElementById('credPanel');
+    p.style.display = p.style.display === 'none' || p.style.display === '' ? 'block' : 'none';
+    if (p.style.display === 'block') {
+      const id = localStorage.getItem('os_client_id') || '';
+      document.getElementById('osUser').value = id;
+      document.getElementById('osPass').value = localStorage.getItem('os_client_secret') || '';
+      document.getElementById('credStatus').textContent = id ? 'Client ID: ' + id : 'No credentials saved';
+    }
+  }
+
   function saveCredentials() {
-    const u=document.getElementById('osUser').value.trim(), p=document.getElementById('osPass').value;
-    if (!u||!p) return;
-    localStorage.setItem('os_user',u); localStorage.setItem('os_pass',p);
-    document.getElementById('credStatus').textContent='Saved! Refreshing...';
-    setTimeout(()=>{document.getElementById('credPanel').style.display='none';refreshAll();},800);
+    const id = document.getElementById('osUser').value.trim();
+    const secret = document.getElementById('osPass').value.trim();
+    if (!id || !secret) return;
+    localStorage.setItem('os_client_id', id);
+    localStorage.setItem('os_client_secret', secret);
+    cachedToken = null; tokenExpiry = 0;
+    document.getElementById('credStatus').textContent = 'Saved! Connecting...';
+    setTimeout(() => { document.getElementById('credPanel').style.display = 'none'; refreshAll(); }, 800);
   }
+
   function clearCredentials() {
-    localStorage.removeItem('os_user'); localStorage.removeItem('os_pass');
-    document.getElementById('credStatus').textContent='Credentials cleared';
-    document.getElementById('osUser').value=''; document.getElementById('osPass').value='';
-  }
-  function getAuthHeader() {
-    const u=localStorage.getItem('os_user'), p=localStorage.getItem('os_pass');
-    if (u&&p) return 'Basic '+btoa(u+':'+p);
-    return null;
+    localStorage.removeItem('os_client_id'); localStorage.removeItem('os_client_secret');
+    cachedToken = null; tokenExpiry = 0;
+    document.getElementById('credStatus').textContent = 'Credentials cleared';
+    document.getElementById('osUser').value = ''; document.getElementById('osPass').value = '';
   }
 
   // ── Refresh ───────────────────────────────────────────────────
@@ -739,6 +763,11 @@
     if (e.target===this) closeMxModal();
   });
 
+  // Pre-load API credentials
+  if (!localStorage.getItem('os_client_id')) {
+    localStorage.setItem('os_client_id', 'airlinemx-api-client');
+    localStorage.setItem('os_client_secret', 'fxOLCJIgf1e1C8Ec4cOJCnJMAyfeXjgn');
+  }
   requestNotifPermission();
   scheduleMidnightWipe();
   renderCards();
