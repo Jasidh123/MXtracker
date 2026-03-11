@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARN MX Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0d12; --panel:#0f1318; --border:#1e2530; --border-bright:#2e3d50;
+    --accent:#00c8ff; --accent2:#ff6b35; --green:#00e676; --yellow:#ffd600;
+    --red:#ff3d3d; --purple:#b39ddb; --text:#c8d8e8; --text-dim:#4a6070;
+    --text-muted:#2a3a48; --mono:'Share Tech Mono',monospace;
+    --sans:'Barlow',sans-serif; --cond:'Barlow Condensed',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;
+    background-image:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(0,200,255,0.04) 0%,transparent 60%),
+    repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.015) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.015) 40px);}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;
+    border-bottom:1px solid var(--border);background:rgba(10,13,18,0.95);
+    position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+  .logo{display:flex;align-items:center;gap:14px;}
+  .logo-icon{width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+    border:1.5px solid var(--accent);color:var(--accent);font-size:20px;position:relative;}
+  .logo-icon::before{content:'';position:absolute;inset:3px;border:1px solid rgba(0,200,255,0.2);}
+  .logo-text h1{font-family:var(--cond);font-size:22px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;color:#fff;line-height:1;}
+  .logo-text p{font-size:10px;letter-spacing:0.3em;color:var(--text-dim);text-transform:uppercase;font-family:var(--mono);margin-top:2px;}
+  .header-right{display:flex;align-items:center;gap:16px;}
+  .arn-badge{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:0.1em;padding:6px 12px;border:1px solid rgba(0,200,255,0.3);background:rgba(0,200,255,0.05);}
+  .clock{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:0.05em;}
+
+  main{max-width:1200px;margin:0 auto;padding:28px 24px;}
+
+  .info-banner{background:rgba(0,200,255,0.04);border:1px solid rgba(0,200,255,0.15);
+    padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;
+    font-size:12px;font-family:var(--mono);color:var(--text-dim);flex-wrap:wrap;}
+  .info-banner .hl{color:var(--accent);}
+
+  /* CRED PANEL */
+  .cred-panel{background:rgba(0,200,255,0.03);border:1px solid rgba(0,200,255,0.12);
+    padding:14px 18px;margin-bottom:16px;display:none;}
+  .cred-panel .plabel{font-family:var(--mono);font-size:9px;letter-spacing:0.25em;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;}
+  .cred-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .cred-field{display:flex;flex-direction:column;gap:4px;}
+  .cred-field label{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;color:var(--text-dim);}
+  .cred-field input{background:#070a0e;border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 11px;outline:none;width:170px;}
+  .cred-field input:focus{border-color:var(--accent);}
+
+  /* SECTION */
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .section-title{font-family:var(--cond);font-size:13px;font-weight:700;letter-spacing:0.25em;
+    text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+  .section-title::before{content:'';display:block;width:12px;height:1px;background:var(--accent);}
+
+  /* BUTTONS */
+  .btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);
+    font-family:var(--mono);font-size:10px;padding:5px 12px;cursor:pointer;
+    transition:all 0.15s;letter-spacing:0.1em;display:inline-flex;align-items:center;gap:5px;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+  .btn.primary:hover{background:#33d4ff;}
+  .btn.mx-on{border-color:var(--purple);color:var(--purple);background:rgba(179,157,219,0.08);}
+  .btn.mx-on:hover{border-color:#d0b8ff;color:#d0b8ff;}
+  .btn.danger:hover{border-color:var(--red);color:var(--red);}
+  .btn.spinning .ri{animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* FILTER TABS */
+  .filter-bar{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .filter-tab{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:0.2em;
+    text-transform:uppercase;padding:8px 18px;border:1px solid var(--border);
+    background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.15s;
+    display:flex;align-items:center;gap:8px;}
+  .filter-tab:hover{border-color:var(--border-bright);color:var(--text);}
+  .filter-tab.active           {border-color:var(--accent); color:var(--accent); background:rgba(0,200,255,0.07);}
+  .filter-tab.f-inbound.active {border-color:var(--green);  color:var(--green);  background:rgba(0,230,118,0.07);}
+  .filter-tab.f-ground.active  {border-color:var(--accent2);color:var(--accent2);background:rgba(255,107,53,0.07);}
+  .filter-tab.f-mx             {opacity:0.55;}
+  .filter-tab.f-mx.active      {border-color:var(--purple); color:var(--purple); background:rgba(179,157,219,0.07);opacity:1;}
+  .filter-tab.f-history.active {border-color:var(--yellow); color:var(--yellow); background:rgba(255,214,0,0.07);}
+  .filter-count{font-family:var(--mono);font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);}
+
+  .no-results{border:1px dashed var(--border);padding:40px 24px;text-align:center;
+    color:var(--text-dim);font-family:var(--mono);font-size:12px;letter-spacing:0.1em;}
+
+  /* CARDS */
+  .aircraft-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+  .ac-card{background:var(--panel);border:1px solid var(--border);position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.15s;}
+  .ac-card:hover{border-color:var(--border-bright);transform:translateY(-1px);}
+  .ac-card.mx-active{border-color:rgba(179,157,219,0.4);}
+  .ac-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,200,255,0.02) 0%,transparent 60%);pointer-events:none;}
+
+  .status-bar{height:3px;width:100%;}
+  .status-bar.airborne   {background:var(--green);}
+  .status-bar.grounded   {background:var(--accent2);}
+  .status-bar.grounded_arn{background:var(--green);}
+  .status-bar.not_visible{background:var(--border);}
+  .status-bar.rate_limit {background:var(--yellow);}
+  .status-bar.unknown    {background:var(--border);}
+  .status-bar.loading    {background:linear-gradient(90deg,var(--border),var(--accent),var(--border));background-size:200%;animation:shimmer 1.5s linear infinite;}
+  @keyframes shimmer{to{background-position:-200% 0;}}
+
+  .card-body{padding:16px 18px;}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+  .reg-tag{font-family:var(--mono);font-size:22px;font-weight:700;color:#fff;letter-spacing:0.1em;line-height:1;}
+  .ac-type{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:4px;letter-spacing:0.1em;}
+  .icao-tag{font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;margin-top:2px;}
+  .mx-label{font-family:var(--mono);font-size:9px;color:var(--purple);letter-spacing:0.1em;margin-top:3px;}
+
+  .status-badge{font-family:var(--cond);font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:4px 10px;border:1px solid;}
+  .status-badge.airborne    {color:var(--green);   border-color:rgba(0,230,118,0.3); background:rgba(0,230,118,0.08);}
+  .status-badge.grounded    {color:var(--accent2); border-color:rgba(255,107,53,0.3);background:rgba(255,107,53,0.08);}
+  .status-badge.grounded_arn{color:var(--green);   border-color:rgba(0,230,118,0.3); background:rgba(0,230,118,0.08);}
+  .status-badge.not_visible {color:var(--text-dim);border-color:var(--border);       background:transparent;}
+  .status-badge.rate_limit  {color:var(--yellow);  border-color:rgba(255,214,0,0.3); background:rgba(255,214,0,0.05);}
+  .status-badge.unknown     {color:var(--text-dim);border-color:var(--border);       background:transparent;}
+  .status-badge.loading     {color:var(--text-dim);border-color:var(--border);       background:transparent;animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+  .route-line{display:flex;align-items:center;gap:8px;padding:10px 0;
+    border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:12px;}
+  .route-airport{font-family:var(--cond);font-size:20px;font-weight:700;color:var(--text);letter-spacing:0.05em;}
+  .route-airport.dest{color:var(--accent);}
+  .route-arrow{flex:1;height:1px;background:linear-gradient(90deg,var(--border),var(--accent));position:relative;display:flex;align-items:center;justify-content:center;}
+  .route-arrow::after{content:'&#9992;';font-size:12px;color:var(--accent);background:var(--panel);padding:0 4px;}
+  .flight-num{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:2px;}
+
+  .card-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .info-item{display:flex;flex-direction:column;gap:3px;}
+  .info-label{font-family:var(--mono);font-size:9px;letter-spacing:0.25em;color:var(--text-dim);text-transform:uppercase;}
+  .info-value{font-family:var(--mono);font-size:14px;color:var(--text);letter-spacing:0.05em;}
+  .info-value.hl {color:var(--green);}
+  .info-value.dim{color:var(--text-muted);font-style:italic;font-size:12px;}
+
+  .card-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap;}
+  .last-updated{flex:1;font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.1em;}
+
+  /* MX COMPLETE MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:var(--panel);border:1px solid var(--border-bright);padding:28px;width:100%;max-width:460px;position:relative;}
+  .modal::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--purple),transparent);}
+  .modal h3{font-family:var(--cond);font-size:18px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--purple);margin-bottom:6px;}
+  .modal .sub{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:18px;letter-spacing:0.1em;}
+  .modal label{font-family:var(--mono);font-size:9px;letter-spacing:0.25em;color:var(--text-dim);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .modal textarea{width:100%;background:#070a0e;border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:12px;padding:10px 12px;outline:none;resize:vertical;min-height:100px;letter-spacing:0.05em;}
+  .modal textarea:focus{border-color:var(--purple);}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+
+  /* HISTORY PANEL */
+  .history-panel{display:none;}
+  .history-entry{background:var(--panel);border:1px solid var(--border);padding:16px 18px;margin-bottom:10px;position:relative;}
+  .history-entry::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--purple);}
+  .history-reg{font-family:var(--mono);font-size:18px;font-weight:700;color:#fff;letter-spacing:0.1em;}
+  .history-time{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:3px;}
+  .history-notes{font-family:var(--mono);font-size:12px;color:var(--text);margin-top:10px;padding-top:10px;border-top:1px solid var(--border);line-height:1.6;white-space:pre-wrap;}
+  .history-empty{border:1px dashed var(--border);padding:40px;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:12px;}
+
+  /* NOTIFICATION TOAST */
+  .toast{position:fixed;bottom:24px;right:24px;background:#0f1318;border:1px solid var(--green);
+    padding:14px 18px;z-index:2000;font-family:var(--mono);font-size:12px;color:var(--green);
+    max-width:320px;animation:slideIn 0.3s ease;box-shadow:0 4px 24px rgba(0,230,118,0.15);}
+  .toast.warn{border-color:var(--yellow);color:var(--yellow);box-shadow:0 4px 24px rgba(255,214,0,0.15);}
+  @keyframes slideIn{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+  @media(max-width:600px){
+    header{padding:12px 16px;}
+    main{padding:16px 12px;}
+    .aircraft-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">&#9992;</div>
+    <div class="logo-text">
+      <h1>MX Tracker</h1>
+      <p>Arlanda Ground Ops &middot; BRA / SK Fleet</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="arn-badge">ARN / ESSA</div>
+    <div class="clock" id="clock">--:--:-- CET</div>
+  </div>
+</header>
+
+<main>
+  <div class="info-banner">
+    <span class="hl">&#8505;</span>&nbsp;Live data via OpenSky Network. Stockholm time (CET/CEST). Auto-refreshes every 5 min.
+    <button class="btn" style="margin-left:auto" onclick="toggleCredPanel()">&#9881; OpenSky Login</button>
+  </div>
+
+  <div class="cred-panel" id="credPanel">
+    <div class="plabel">OpenSky Credentials &mdash; stored locally in your browser only</div>
+    <div class="cred-row">
+      <div class="cred-field"><label>Username</label><input id="osUser" type="text" /></div>
+      <div class="cred-field"><label>Password</label><input id="osPass" type="password" /></div>
+      <button class="btn primary" onclick="saveCredentials()">Save</button>
+      <button class="btn" onclick="clearCredentials()">Clear</button>
+    </div>
+    <div id="credStatus" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:8px"></div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">BRA Fleet &middot; <span style="color:var(--accent);margin-left:4px" id="acCount">15</span>&nbsp;Aircraft</div>
+    <button class="btn spinning" id="refreshAllBtn" onclick="refreshAll()">
+      <span class="ri">&#8635;</span> Refresh All
+    </button>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-tab active"    id="tab-all"     onclick="setFilter('all')">All <span class="filter-count" id="cnt-all">15</span></button>
+    <button class="filter-tab f-inbound" id="tab-inbound" onclick="setFilter('inbound')">&#9992; Inbound ARN <span class="filter-count" id="cnt-inbound">0</span></button>
+    <button class="filter-tab f-ground"  id="tab-ground"  onclick="setFilter('ground')">&#9632; On Ground <span class="filter-count" id="cnt-ground">0</span></button>
+    <button class="filter-tab f-mx"      id="tab-mx"      onclick="setFilter('mx')">&#128295; MX <span class="filter-count" id="cnt-mx">0</span></button>
+    <button class="filter-tab f-history" id="tab-history" onclick="setFilter('history')">&#128196; History <span class="filter-count" id="cnt-history">0</span></button>
+  </div>
+
+  <div id="noResults" class="no-results" style="display:none">No aircraft match this filter</div>
+  <div class="aircraft-grid" id="aircraftGrid"></div>
+
+  <!-- HISTORY PANEL -->
+  <div class="history-panel" id="historyPanel"></div>
+</main>
+
+<!-- MX COMPLETE MODAL -->
+<div class="modal-overlay" id="mxModal" style="display:none">
+  <div class="modal">
+    <h3>Complete MX</h3>
+    <div class="sub" id="mxModalSub">SE-MKA &mdash; Log maintenance performed</div>
+    <label>What was performed?</label>
+    <textarea id="mxNotes" placeholder="e.g. Line check completed, replaced landing light, tyre check..."></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeMxModal()">Cancel</button>
+      <button class="btn primary" onclick="completeMx()">Save to History</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const DEFAULT_FLEET = [
+    {reg:'SE-MKA',type:'AT76',nick:'BRA / SK',icao24:'4ab561'},
+    {reg:'SE-MKB',type:'AT76',nick:'BRA / SK',icao24:'4ab562'},
+    {reg:'SE-MKC',type:'AT76',nick:'BRA / SK',icao24:'4ab563'},
+    {reg:'SE-MKD',type:'AT76',nick:'BRA / SK',icao24:'4ab564'},
+    {reg:'SE-MKE',type:'AT76',nick:'BRA / SK',icao24:'4ab565'},
+    {reg:'SE-MKF',type:'AT76',nick:'BRA / SK',icao24:'4ab566'},
+    {reg:'SE-MKG',type:'AT76',nick:'BRA / SK',icao24:'4ab567'},
+    {reg:'SE-MKH',type:'AT76',nick:'BRA / SK',icao24:'4ab568'},
+    {reg:'SE-MKI',type:'AT76',nick:'BRA / SK',icao24:'4ab569'},
+    {reg:'SE-MKK',type:'AT76',nick:'BRA / SK',icao24:'4ab56b'},
+    {reg:'SE-MKN',type:'AT76',nick:'BRA / SK',icao24:'4ab56e'},
+    {reg:'SE-MKO',type:'AT76',nick:'BRA / SK',icao24:'4ab56f'},
+    {reg:'SE-MNP',type:'AT76',nick:'BRA / SK',icao24:'4ab5d0'},
+    {reg:'SE-MNR',type:'AT76',nick:'BRA / SK',icao24:'4ab5d2'},
+    {reg:'SE-MNU',type:'AT76',nick:'BRA / SK',icao24:'4ab5d5'},
+  ];
+
+  const stored = localStorage.getItem('mx_fleet_v5');
+  let aircraft = stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(DEFAULT_FLEET));
+  if (!stored) localStorage.setItem('mx_fleet_v5', JSON.stringify(aircraft));
+
+  let flightData = {};
+  let activeFilter = 'all';
+  let mxModalReg = null;
+  let notifiedRegs = {};
+
+  // ── History ──────────────────────────────────────────────────
+  function getTodayKey() {
+    return new Date().toLocaleDateString('sv-SE', {timeZone:'Europe/Stockholm'});
+  }
+
+  function loadHistory() {
+    const today = getTodayKey();
+    const stored = localStorage.getItem('mx_history');
+    if (!stored) return [];
+    const all = JSON.parse(stored);
+    // Wipe old days
+    if (all.date !== today) {
+      localStorage.removeItem('mx_history');
+      return [];
+    }
+    return all.entries || [];
+  }
+
+  function saveHistory(entries) {
+    localStorage.setItem('mx_history', JSON.stringify({date: getTodayKey(), entries}));
+  }
+
+  // ── MX Toggle ────────────────────────────────────────────────
+  function toggleMX(reg) {
+    const ac = aircraft.find(a => a.reg === reg);
+    if (!ac) return;
+    ac.mx = !ac.mx;
+    localStorage.setItem('mx_fleet_v5', JSON.stringify(aircraft));
+    updateCard(reg);
+    updateCounts();
+    applyFilter();
+  }
+
+  function openMxModal(reg) {
+    mxModalReg = reg;
+    document.getElementById('mxModalSub').textContent = reg + ' \u2014 Log maintenance performed';
+    document.getElementById('mxNotes').value = '';
+    document.getElementById('mxModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('mxNotes').focus(), 100);
+  }
+
+  function closeMxModal() {
+    document.getElementById('mxModal').style.display = 'none';
+    mxModalReg = null;
+  }
+
+  function completeMx() {
+    if (!mxModalReg) return;
+    const notes = document.getElementById('mxNotes').value.trim();
+    const ac = aircraft.find(a => a.reg === mxModalReg);
+
+    // Save to history
+    const entries = loadHistory();
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('sv-SE', {timeZone:'Europe/Stockholm', hour:'2-digit', minute:'2-digit'});
+    const tz = now.toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02') ? 'CEST' : 'CET';
+    entries.unshift({
+      reg: mxModalReg,
+      type: ac ? ac.type : '',
+      time: timeStr + ' ' + tz,
+      notes: notes || '(no notes)',
+      id: Date.now()
+    });
+    saveHistory(entries);
+
+    // Remove MX flag
+    const completedReg = mxModalReg;
+    if (ac) ac.mx = false;
+    localStorage.setItem('mx_fleet_v5', JSON.stringify(aircraft));
+
+    closeMxModal();
+    // Force full re-render of card so button resets to normal state
+    const card = document.getElementById('card-' + completedReg);
+    if (card) {
+      card.className = 'ac-card'; // remove mx-active class
+      card.innerHTML = cardHTML(ac, flightData[completedReg] || null, false);
+    }
+    updateCounts();
+    applyFilter();
+    renderHistory();
+    showToast('MX logged for ' + completedReg, 'ok');
+  }
+
+  // ── History Render ────────────────────────────────────────────
+  function renderHistory() {
+    const entries = loadHistory();
+    const panel = document.getElementById('historyPanel');
+    document.getElementById('cnt-history').textContent = entries.length;
+    if (entries.length === 0) {
+      panel.innerHTML = '<div class="history-empty">No maintenance logged today</div>';
+      return;
+    }
+    panel.innerHTML = entries.map(e => `
+      <div class="history-entry">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="history-reg">${e.reg}</div>
+            <div class="history-time">${e.type} &middot; Logged at ${e.time}</div>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--purple);border:1px solid rgba(179,157,219,0.3);padding:3px 8px;">COMPLETED</div>
+        </div>
+        <div class="history-notes">${e.notes}</div>
+      </div>`).join('');
+  }
+
+  // ── Notifications ─────────────────────────────────────────────
+  function requestNotifPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function checkETANotifications() {
+    aircraft.forEach(ac => {
+      const d = flightData[ac.reg];
+      if (!d || d.status !== 'airborne' || !d.distKm || !d.vel_kts) return;
+      const speedKmH = d.vel_kts * 1.852;
+      if (speedKmH < 10) return;
+      const etaMin = (d.distKm / speedKmH) * 60;
+      const key = ac.reg + '_5min';
+      if (etaMin <= 5 && etaMin > 0 && !notifiedRegs[key]) {
+        notifiedRegs[key] = true;
+        triggerETAAlert(ac.reg, Math.round(etaMin));
+      }
+      // Reset once aircraft has landed
+      if (d.status !== 'airborne') delete notifiedRegs[key];
+    });
+  }
+
+  function triggerETAAlert(reg, mins) {
+    const msg = reg + ' arriving in ~' + mins + ' min \u2014 head to gate!';
+    // Browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('ARN MX Tracker \u2014 ETA Alert', {
+        body: msg,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">&#9992;</text></svg>'
+      });
+    }
+    // In-app toast
+    showToast('&#9992; ' + msg, 'warn');
+  }
+
+  function showToast(msg, type) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = 'toast' + (type === 'warn' ? ' warn' : '');
+    t.innerHTML = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { if (t.parentNode) t.remove(); }, 7000);
+  }
+
+  // ── Clock ─────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const t = now.toLocaleTimeString('sv-SE',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const d = now.toLocaleDateString('sv-SE',{timeZone:'Europe/Stockholm',weekday:'short',day:'numeric',month:'short'});
+    const tz = now.toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02') ? 'CEST':'CET';
+    document.getElementById('clock').textContent = d + '  ' + t + ' ' + tz;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Filters ───────────────────────────────────────────────────
+  function setFilter(f) {
+    activeFilter = f;
+    ['all','inbound','ground','mx','history'].forEach(id => {
+      document.getElementById('tab-'+id).classList.toggle('active', id === f);
+    });
+    const grid    = document.getElementById('aircraftGrid');
+    const histPnl = document.getElementById('historyPanel');
+    if (f === 'history') {
+      grid.style.display = 'none';
+      histPnl.style.display = 'block';
+      renderHistory();
+    } else {
+      grid.style.display = 'grid';
+      histPnl.style.display = 'none';
+      applyFilter();
+    }
+  }
+
+  function applyFilter() {
+    const grid = document.getElementById('aircraftGrid');
+    let visible = 0;
+
+    if (activeFilter === 'inbound') {
+      const sorted = [...aircraft].sort((a,b) => {
+        const da = flightData[a.reg], db = flightData[b.reg];
+        const dA = (da && da.status==='airborne' && da.distKm!=null) ? da.distKm : Infinity;
+        const dB = (db && db.status==='airborne' && db.distKm!=null) ? db.distKm : Infinity;
+        return dA - dB;
+      });
+      sorted.forEach(ac => { const c=document.getElementById('card-'+ac.reg); if(c) grid.appendChild(c); });
+    } else {
+      aircraft.forEach(ac => { const c=document.getElementById('card-'+ac.reg); if(c) grid.appendChild(c); });
+    }
+
+    aircraft.forEach(ac => {
+      const card = document.getElementById('card-'+ac.reg);
+      if (!card) return;
+      const d = flightData[ac.reg];
+      let show = false;
+      if      (activeFilter==='all')     show = true;
+      else if (activeFilter==='inbound') show = d && d.status==='airborne';
+      else if (activeFilter==='ground')  show = d && d.status==='grounded_arn';
+      else if (activeFilter==='mx')      show = !!ac.mx;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('noResults').style.display = visible===0 ? 'block':'none';
+  }
+
+  function updateCounts() {
+    let inbound=0, ground=0, mx=0;
+    aircraft.forEach(ac => {
+      const d = flightData[ac.reg];
+      if (d && d.status==='airborne') inbound++;
+      if (d && d.status==='grounded_arn') ground++;
+      if (ac.mx) mx++;
+    });
+    document.getElementById('cnt-all').textContent     = aircraft.length;
+    document.getElementById('cnt-inbound').textContent = inbound;
+    document.getElementById('cnt-ground').textContent  = ground;
+    document.getElementById('cnt-mx').textContent      = mx;
+    document.getElementById('cnt-history').textContent = loadHistory().length;
+  }
+
+  // ── OpenSky ───────────────────────────────────────────────────
+  const ARN_LAT=59.6519, ARN_LON=17.9186;
+
+  async function fetchFlight(reg) {
+    const ac = aircraft.find(a => a.reg===reg);
+    if (!ac || !ac.icao24) {
+      flightData[reg]={status:'unknown',updatedAt:new Date()};
+      updateCard(reg); updateCounts(); applyFilter(); return;
+    }
+    setCardLoading(reg, true);
+    try {
+      const auth = getAuthHeader();
+      const opts = auth ? {headers:{'Authorization':auth}} : {};
+      const resp = await fetch('https://opensky-network.org/api/states/all?icao24='+ac.icao24.toLowerCase(), opts);
+      if (!resp.ok) {
+        flightData[reg]={status:'rate_limit',updatedAt:new Date()};
+      } else {
+        const json = await resp.json();
+        const st = json.states;
+        if (st && st.length > 0) {
+          const s=st[0];
+          const callsign=(s[1]||'').trim(), lon=s[5], lat=s[6];
+          const alt_m=s[7]||s[13]||0, on_ground=s[8], vel_ms=s[9]||0, track=s[10]||0;
+          const alt_ft=Math.round((alt_m||0)*3.281), vel_kts=Math.round((vel_ms||0)*1.944);
+          let eta='', distKm=null;
+          if (lat && lon && !on_ground) {
+            distKm=haversine(lat,lon,ARN_LAT,ARN_LON);
+            if (vel_ms>30) {
+              const mins=Math.round((distKm/(vel_ms*3.6))*60);
+              const etaD=new Date(Date.now()+mins*60000);
+              const tz=new Date().toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02')?'CEST':'CET';
+              eta=fmtTime(etaD)+' '+tz+' (~'+mins+'min)';
+            }
+          }
+          let groundStatus='grounded';
+          if (on_ground && lat && lon) {
+            groundStatus = haversine(lat,lon,ARN_LAT,ARN_LON) < 3 ? 'grounded_arn' : 'grounded';
+          }
+          flightData[reg]={
+            callsign, status:on_ground?groundStatus:'airborne',
+            alt_ft, vel_kts, track:Math.round(track), lat, lon,
+            distKm:distKm?Math.round(distKm):null, eta, updatedAt:new Date()
+          };
+        } else {
+          flightData[reg]={status:'not_visible',updatedAt:new Date()};
+        }
+      }
+    } catch(e) {
+      flightData[reg]={status:'unknown',updatedAt:new Date()};
+    }
+    setCardLoading(reg, false);
+    updateCard(reg); updateCounts(); applyFilter();
+    checkETANotifications();
+  }
+
+  function haversine(la1,lo1,la2,lo2) {
+    const R=6371,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+    const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  function fmtTime(d) {
+    return d.toLocaleTimeString('sv-SE',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit'});
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  function renderCards() {
+    const grid = document.getElementById('aircraftGrid');
+    grid.innerHTML='';
+    aircraft.forEach(ac => {
+      const div=document.createElement('div');
+      div.className='ac-card'+(ac.mx?' mx-active':'');
+      div.id='card-'+ac.reg;
+      div.innerHTML=cardHTML(ac,flightData[ac.reg]||null,true);
+      grid.appendChild(div);
+    });
+    document.getElementById('acCount').textContent=aircraft.length;
+  }
+
+  function updateCard(reg) {
+    const card=document.getElementById('card-'+reg);
+    if (!card) return;
+    const ac=aircraft.find(a=>a.reg===reg);
+    if (!ac) return;
+    card.className='ac-card'+(ac.mx?' mx-active':'');
+    card.innerHTML=cardHTML(ac,flightData[reg]||null,false);
+  }
+
+  function setCardLoading(reg, on) {
+    const card=document.getElementById('card-'+reg);
+    if (!card||!on) return;
+    const bar=card.querySelector('.status-bar'), badge=card.querySelector('.status-badge');
+    if (bar) bar.className='status-bar loading';
+    if (badge){badge.className='status-badge loading';badge.textContent='Fetching...';}
+  }
+
+  function cardHTML(ac, data, init) {
+    let sc='unknown', sl='No Data';
+    let callsign='&mdash;',alt='&mdash;',spd='&mdash;',hdg='&mdash;';
+    let eta='&mdash;',dist='&mdash;',upd='',extra='';
+
+    if (init&&!data){sc='loading';sl='Fetching...';}
+    else if (data) {
+      if (data.updatedAt) {
+        const d=new Date(data.updatedAt);
+        const t=d.toLocaleTimeString('sv-SE',{timeZone:'Europe/Stockholm',hour:'2-digit',minute:'2-digit'});
+        const tz=d.toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02')?'CEST':'CET';
+        upd=t+' '+tz;
+      }
+      if (data.status==='airborne'){
+        sc='airborne';sl='Airborne';
+        callsign=data.callsign||'&mdash;';
+        alt=data.alt_ft?data.alt_ft.toLocaleString()+' ft':'&mdash;';
+        spd=data.vel_kts?data.vel_kts+' kts':'&mdash;';
+        hdg=data.track!==undefined?data.track+'&deg;':'&mdash;';
+        eta=data.eta||'&mdash;';
+        dist=data.distKm?data.distKm+' km':'&mdash;';
+      } else if (data.status==='grounded_arn'){
+        sc='grounded_arn';sl='On Ground \u2022 ARN';
+        callsign=data.callsign||'&mdash;';alt='0 ft';spd='0 kts';
+      } else if (data.status==='grounded'){
+        sc='grounded';sl='On Ground';
+        callsign=data.callsign||'&mdash;';alt='0 ft';spd='0 kts';
+      } else if (data.status==='not_visible'){
+        sc='not_visible';sl='Not Visible';
+        extra='Not detected by OpenSky &mdash; may be parked or powered off';
+      } else if (data.status==='rate_limit'){
+        sc='rate_limit';sl='Rate Limited';extra='OpenSky rate limit &mdash; try again shortly';
+      } else {
+        sc='unknown';sl='No Data';extra='No data available';
+      }
+    }
+
+    const etaCls=sc==='airborne'?'hl':'dim';
+    const infoBlock=extra
+      ?`<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:10px">${extra}</div>`
+      :`<div class="card-info">
+          <div class="info-item"><div class="info-label">ETA to ARN</div><span class="info-value ${etaCls}" style="font-size:12px">${eta}</span></div>
+          <div class="info-item"><div class="info-label">Distance</div><span class="info-value">${dist}</span></div>
+          <div class="info-item"><div class="info-label">Altitude</div><span class="info-value">${alt}</span></div>
+          <div class="info-item"><div class="info-label">Speed / Heading</div><span class="info-value">${spd} / ${hdg}</span></div>
+        </div>`;
+
+    const mxBtn = ac.mx
+      ? `<button class="btn mx-on" onclick="openMxModal('${ac.reg}')">&#128295; Complete MX</button>`
+      : `<button class="btn" onclick="toggleMX('${ac.reg}')">&#128295; MX</button>`;
+
+    return `
+      <div class="status-bar ${sc}"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <div>
+            <div class="reg-tag">${ac.reg}</div>
+            <div class="ac-type">${ac.type} &middot; ${ac.nick}</div>
+            <div class="icao-tag">ICAO24: ${ac.icao24||'&mdash;'}</div>
+            ${ac.mx?'<div class="mx-label">&#128295; IN MX</div>':''}
+          </div>
+          <div style="text-align:right"><div class="status-badge ${sc}">${sl}</div></div>
+        </div>
+        <div class="route-line">
+          <div>
+            <div class="route-airport" style="font-size:14px;color:var(--text-dim)">${callsign}</div>
+            <div class="flight-num">Callsign</div>
+          </div>
+          <div class="route-arrow"></div>
+          <div style="text-align:right">
+            <div class="route-airport dest">ARN</div>
+            <div class="flight-num">Destination</div>
+          </div>
+        </div>
+        ${infoBlock}
+        <div class="card-actions">
+          <span class="last-updated">${upd?'Updated '+upd:''}</span>
+          ${mxBtn}
+          <button class="btn" onclick="fetchFlight('${ac.reg}')">&#8635;</button>
+        </div>
+      </div>`;
+  }
+
+  // ── Credentials ───────────────────────────────────────────────
+  function toggleCredPanel() {
+    const p=document.getElementById('credPanel');
+    p.style.display=p.style.display==='none'||p.style.display===''?'block':'none';
+    if (p.style.display==='block') {
+      const u=localStorage.getItem('os_user')||'';
+      document.getElementById('osUser').value=u;
+      document.getElementById('osPass').value=localStorage.getItem('os_pass')||'';
+      document.getElementById('credStatus').textContent=u?'Logged in as: '+u:'No credentials saved';
+    }
+  }
+  function saveCredentials() {
+    const u=document.getElementById('osUser').value.trim(), p=document.getElementById('osPass').value;
+    if (!u||!p) return;
+    localStorage.setItem('os_user',u); localStorage.setItem('os_pass',p);
+    document.getElementById('credStatus').textContent='Saved! Refreshing...';
+    setTimeout(()=>{document.getElementById('credPanel').style.display='none';refreshAll();},800);
+  }
+  function clearCredentials() {
+    localStorage.removeItem('os_user'); localStorage.removeItem('os_pass');
+    document.getElementById('credStatus').textContent='Credentials cleared';
+    document.getElementById('osUser').value=''; document.getElementById('osPass').value='';
+  }
+  function getAuthHeader() {
+    const u=localStorage.getItem('os_user'), p=localStorage.getItem('os_pass');
+    if (u&&p) return 'Basic '+btoa(u+':'+p);
+    return null;
+  }
+
+  // ── Refresh ───────────────────────────────────────────────────
+  async function refreshAll() {
+    const btn=document.getElementById('refreshAllBtn');
+    btn.classList.add('spinning');
+    for (const ac of aircraft) {
+      await fetchFlight(ac.reg);
+      await new Promise(r=>setTimeout(r,300));
+    }
+    btn.classList.remove('spinning');
+  }
+
+  // Midnight history wipe check
+  function scheduleMidnightWipe() {
+    const now=new Date();
+    const midnight=new Date(now);
+    midnight.setHours(24,0,0,0);
+    const msUntilMidnight=midnight-now;
+    setTimeout(()=>{
+      localStorage.removeItem('mx_history');
+      renderHistory(); updateCounts();
+      showToast('History wiped for new day','ok');
+      scheduleMidnightWipe();
+    }, msUntilMidnight);
+  }
+
+  // Close modal on overlay click
+  document.getElementById('mxModal').addEventListener('click', function(e){
+    if (e.target===this) closeMxModal();
+  });
+
+  requestNotifPermission();
+  scheduleMidnightWipe();
+  renderCards();
+  renderHistory();
+  updateCounts();
+  refreshAll();
+</script>
+</body>
+</html>
