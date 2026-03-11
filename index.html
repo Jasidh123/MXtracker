@@ -191,19 +191,11 @@
 
 <main>
   <div class="info-banner">
-    <span class="hl">&#8505;</span>&nbsp;Live data via OpenSky Network. Stockholm time (CET/CEST). Auto-refreshes every 5 min.
-    <button class="btn" style="margin-left:auto" onclick="toggleCredPanel()">&#9881; OpenSky Login</button>
+    <span class="hl">&#8505;</span>&nbsp;Live data via adsb.fi. Stockholm time (CET/CEST). Auto-refreshes every 5 min.
   </div>
 
-  <div class="cred-panel" id="credPanel">
-    <div class="plabel">OpenSky Credentials &mdash; stored locally in your browser only</div>
-    <div class="cred-row">
-      <div class="cred-field"><label>Client ID</label><input id="osUser" type="text" /></div>
-      <div class="cred-field"><label>Client Secret</label><input id="osPass" type="password" /></div>
-      <button class="btn primary" onclick="saveCredentials()">Save</button>
-      <button class="btn" onclick="clearCredentials()">Clear</button>
-    </div>
-    <div id="credStatus" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:8px"></div>
+  <div class="cred-panel" id="credPanel" style="display:none">
+    <div id="credStatus"></div>
   </div>
 
   <div class="section-header">
@@ -511,52 +503,57 @@
   async function fetchAllFlights() {
     // Fleet ICAO24s for local filtering after bbox fetch
     try {
-      // Call Cloudflare Worker proxy (handles auth + CORS)
-      const resp = await fetch('https://opensky-proxy.maintaircraft.workers.dev/');
+      // adsb.fi - free, no auth, no CORS issues, supports comma-separated hex
+      const hexList = aircraft.map(a => a.icao24.toLowerCase()).join(',');
+      const resp = await fetch('https://opendata.adsb.fi/api/v2/icao/' + hexList);
+      console.log('[ADSB] status:', resp.status, resp.ok);
       if (!resp.ok) {
+        console.log('[ADSB] Error response:', resp.status);
         aircraft.forEach(ac => {
           flightData[ac.reg] = {status:'rate_limit', updatedAt:new Date()};
         });
       } else {
         const json = await resp.json();
-        const states = json.states || [];
-
-        // Build lookup map by icao24, filtering only our fleet
-        const ourIcaos = new Set(aircraft.map(a => a.icao24.toLowerCase()));
+        console.log('[ADSB] Response keys:', Object.keys(json), 'ac count:', (json.ac||[]).length);
+        const acList = json.ac || [];
         const stateMap = {};
-        states.forEach(s => {
-          const icao = (s[0]||'').toLowerCase();
-          if (ourIcaos.has(icao)) stateMap[icao] = s;
-        });
+        acList.forEach(a => { stateMap[(a.hex||'').toLowerCase()] = a; });
 
         const tz = new Date().toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02')?'CEST':'CET';
 
         aircraft.forEach(ac => {
           const s = stateMap[ac.icao24.toLowerCase()];
           if (!s) {
+            console.log('[ADSB] Not visible:', ac.reg, ac.icao24);
             flightData[ac.reg] = {status:'not_visible', updatedAt:new Date()};
             return;
           }
-          const callsign=(s[1]||'').trim(), lon=s[5], lat=s[6];
-          const alt_m=s[7]||s[13]||0, on_ground=s[8], vel_ms=s[9]||0, track=s[10]||0;
-          const alt_ft=Math.round((alt_m||0)*3.281), vel_kts=Math.round((vel_ms||0)*1.944);
+          console.log('[ADSB] Found:', ac.reg, s.flight, 'alt:', s.alt_baro, 'gs:', s.gs);
+          const callsign = (s.flight||'').trim();
+          const lat = s.lat, lon = s.lon;
+          const alt_ft = s.alt_baro === 'ground' ? 0 : (s.alt_baro || s.alt_geom || 0);
+          const vel_kts = s.gs || 0;
+          const track = s.track || 0;
+          const on_ground = s.alt_baro === 'ground' || (s.gs !== undefined && s.gs < 30 && alt_ft < 100);
           let eta='', distKm=null;
           if (lat && lon && !on_ground) {
-            distKm=haversine(lat,lon,ARN_LAT,ARN_LON);
-            if (vel_ms>30) {
-              const mins=Math.round((distKm/(vel_ms*3.6))*60);
-              const etaD=new Date(Date.now()+mins*60000);
-              eta=fmtTime(etaD)+' '+tz+' (~'+mins+'min)';
+            distKm = haversine(lat, lon, ARN_LAT, ARN_LON);
+            if (vel_kts > 50) {
+              const speedKmH = vel_kts * 1.852;
+              const mins = Math.round((distKm / speedKmH) * 60);
+              const etaD = new Date(Date.now() + mins * 60000);
+              eta = fmtTime(etaD) + ' ' + tz + ' (~' + mins + 'min)';
             }
           }
-          let groundStatus='grounded';
+          let groundStatus = 'grounded';
           if (on_ground && lat && lon) {
-            groundStatus = haversine(lat,lon,ARN_LAT,ARN_LON) < 3 ? 'grounded_arn' : 'grounded';
+            groundStatus = haversine(lat, lon, ARN_LAT, ARN_LON) < 3 ? 'grounded_arn' : 'grounded';
           }
-          flightData[ac.reg]={
-            callsign, status:on_ground?groundStatus:'airborne',
-            alt_ft, vel_kts, track:Math.round(track), lat, lon,
-            distKm:distKm?Math.round(distKm):null, eta, updatedAt:new Date()
+          flightData[ac.reg] = {
+            callsign, status: on_ground ? groundStatus : 'airborne',
+            alt_ft: Math.round(alt_ft), vel_kts: Math.round(vel_kts),
+            track: Math.round(track), lat, lon,
+            distKm: distKm ? Math.round(distKm) : null, eta, updatedAt: new Date()
           };
         });
       }
@@ -781,11 +778,6 @@
     if (e.target===this) closeMxModal();
   });
 
-  // Pre-load API credentials
-  if (!localStorage.getItem('os_client_id')) {
-    localStorage.setItem('os_client_id', 'airlinemx-api-client');
-    localStorage.setItem('os_client_secret', 'fxOLCJIgf1e1C8Ec4cOJCnJMAyfeXjgn');
-  }
   requestNotifPermission();
   scheduleMidnightWipe();
   renderCards();
