@@ -501,24 +501,42 @@
   // ── OpenSky ───────────────────────────────────────────────────
   const ARN_LAT=59.6519, ARN_LON=17.9186;
 
+  // Single card refresh (calls bulk but only updates one)
   async function fetchFlight(reg) {
-    const ac = aircraft.find(a => a.reg===reg);
-    if (!ac || !ac.icao24) {
-      flightData[reg]={status:'unknown',updatedAt:new Date()};
-      updateCard(reg); updateCounts(); applyFilter(); return;
-    }
     setCardLoading(reg, true);
+    await fetchAllFlights();
+  }
+
+  // Bulk fetch — all 15 aircraft in ONE request
+  async function fetchAllFlights() {
+    // Fleet ICAO24s for local filtering after bbox fetch
     try {
-      const token = await getBearerToken();
-      const headers = token ? {'Authorization': 'Bearer ' + token} : {};
-      const resp = await fetch('https://opensky-network.org/api/states/all?icao24=' + ac.icao24.toLowerCase(), {headers});
+      // Call Cloudflare Worker proxy (handles auth + CORS)
+      const resp = await fetch('https://opensky-proxy.maintaircraft.workers.dev/');
       if (!resp.ok) {
-        flightData[reg]={status:'rate_limit',updatedAt:new Date()};
+        aircraft.forEach(ac => {
+          flightData[ac.reg] = {status:'rate_limit', updatedAt:new Date()};
+        });
       } else {
         const json = await resp.json();
-        const st = json.states;
-        if (st && st.length > 0) {
-          const s=st[0];
+        const states = json.states || [];
+
+        // Build lookup map by icao24, filtering only our fleet
+        const ourIcaos = new Set(aircraft.map(a => a.icao24.toLowerCase()));
+        const stateMap = {};
+        states.forEach(s => {
+          const icao = (s[0]||'').toLowerCase();
+          if (ourIcaos.has(icao)) stateMap[icao] = s;
+        });
+
+        const tz = new Date().toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02')?'CEST':'CET';
+
+        aircraft.forEach(ac => {
+          const s = stateMap[ac.icao24.toLowerCase()];
+          if (!s) {
+            flightData[ac.reg] = {status:'not_visible', updatedAt:new Date()};
+            return;
+          }
           const callsign=(s[1]||'').trim(), lon=s[5], lat=s[6];
           const alt_m=s[7]||s[13]||0, on_ground=s[8], vel_ms=s[9]||0, track=s[10]||0;
           const alt_ft=Math.round((alt_m||0)*3.281), vel_kts=Math.round((vel_ms||0)*1.944);
@@ -528,7 +546,6 @@
             if (vel_ms>30) {
               const mins=Math.round((distKm/(vel_ms*3.6))*60);
               const etaD=new Date(Date.now()+mins*60000);
-              const tz=new Date().toLocaleString('en',{timeZone:'Europe/Stockholm',timeZoneName:'shortOffset'}).includes('+02')?'CEST':'CET';
               eta=fmtTime(etaD)+' '+tz+' (~'+mins+'min)';
             }
           }
@@ -536,21 +553,24 @@
           if (on_ground && lat && lon) {
             groundStatus = haversine(lat,lon,ARN_LAT,ARN_LON) < 3 ? 'grounded_arn' : 'grounded';
           }
-          flightData[reg]={
+          flightData[ac.reg]={
             callsign, status:on_ground?groundStatus:'airborne',
             alt_ft, vel_kts, track:Math.round(track), lat, lon,
             distKm:distKm?Math.round(distKm):null, eta, updatedAt:new Date()
           };
-        } else {
-          flightData[reg]={status:'not_visible',updatedAt:new Date()};
-        }
+        });
       }
     } catch(e) {
-      flightData[reg]={status:'unknown',updatedAt:new Date()};
+      aircraft.forEach(ac => {
+        flightData[ac.reg]={status:'unknown',updatedAt:new Date()};
+      });
     }
-    setCardLoading(reg, false);
-    updateCard(reg); updateCounts(); applyFilter();
-    checkETANotifications();
+    // Update all cards at once
+    aircraft.forEach(ac => {
+      const card = document.getElementById('card-'+ac.reg);
+      if (card) { card.className='ac-card'+(ac.mx?' mx-active':''); card.innerHTML=cardHTML(ac,flightData[ac.reg]||null,false); }
+    });
+    updateCounts(); applyFilter(); checkETANotifications();
   }
 
   function haversine(la1,lo1,la2,lo2) {
@@ -737,10 +757,8 @@
   async function refreshAll() {
     const btn=document.getElementById('refreshAllBtn');
     btn.classList.add('spinning');
-    for (const ac of aircraft) {
-      await fetchFlight(ac.reg);
-      await new Promise(r=>setTimeout(r,300));
-    }
+    aircraft.forEach(ac => setCardLoading(ac.reg, true));
+    await fetchAllFlights();
     btn.classList.remove('spinning');
   }
 
